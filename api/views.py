@@ -89,7 +89,6 @@ def nginx_get(request, version=None):
     fn = find_filename(version=version)
     if fn is None:
         return HttpResponseNotFound()
-    print("FIKA: %r IS %r" % (version, fn))
     with open(fn) as fd:
         response = HttpResponse(content=fd)
         response['Content-Type'] = "text/plain"
@@ -123,10 +122,8 @@ def nginx_undo(request, version=None):
         return HttpResponseBadRequest()
     else:
         v = vs[-1]
-    print("So moving: %r to %r" % (v.filename, find_filename(version=None)))
     shutil.move(v.filename, find_filename(version=None))
     for t in vs:
-        print("UNLINKING %r, newer than %r" % (t.filename, v.filename))
         if t > v:
             os.unlink(t.filename)
     reload_config()
@@ -138,7 +135,6 @@ def nginx_reset(request):
         return HttpResponseNotAllowed(['PUT'])
     vs = find_versions()
     if vs:
-        print("GOING BACK TO %r" % vs[0].filename)
         return nginx_undo(request, version=vs[0].version)
     return HttpResponse() # OK
 
@@ -150,7 +146,6 @@ def nginx_test_config(request):
     with tempfile.NamedTemporaryFile(mode="wb", dir=CONFIG_PATH, delete=True) as tmp_conf:
         for chunk in request.FILES['nginx'].chunks():
             tmp_conf.write(chunk)
-        #print("File: %r" % tmp_conf.name)
         p = subprocess.run("nginx -tc %s" % tmp_conf.name, shell=True, capture_output=True)
         if p.returncode != 0:
             response = HttpResponseServerError(content=p.stderr)
