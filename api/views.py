@@ -150,7 +150,6 @@ def nginx_test_config(request):
             tmp_conf.write(chunk)
         tmp_conf.flush()
         print("HERE", "--"*40)
-        p = subprocess.run("cp %s /etc/nginx/csicsi" % tmp_conf.name, shell=True, capture_output=True)
         p = subprocess.run("nginx -tc %s" % tmp_conf.name, shell=True, capture_output=True)
         if p.returncode != 0:
             response = HttpResponseServerError(content=p.stderr)
