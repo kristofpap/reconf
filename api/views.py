@@ -165,6 +165,7 @@ def nginx_set_config(request):
     with tempfile.NamedTemporaryFile(mode="wb", dir=CONFIG_PATH, delete=False) as tmp_conf:
         for chunk in request.FILES['nginx'].chunks():
             tmp_conf.write(chunk)
+        tmp_conf.flush()
         vs = find_versions()
         if vs:
             v = vs[-1]
