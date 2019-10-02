@@ -152,12 +152,10 @@ def nginx_test_config(request):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
     with tempfile.NamedTemporaryFile(mode="wb", dir=settings.CONFIG_PATH, delete=True) as tmp_conf:
-        print("HERE", "--"*40)
         for chunk in request.FILES['nginx'].chunks():
             print(chunk)
             tmp_conf.write(chunk)
         tmp_conf.flush()
-        print("HERE", "--"*40)
         p = subprocess.run(settings.TEST_COMMAND.format(filename=tmp_conf.name),
                            shell=True, capture_output=True)
         if p.returncode != 0:
@@ -185,6 +183,7 @@ def nginx_set_config(request):
         else:
             v.version += 1
         v.date = datetime.now()
-        shutil.move(config_name, v.filename)
-        shutil.move(tmp_conf.name, config_name)
+        filename = tmp_conf.name
+    shutil.move(config_name, v.filename)
+    shutil.move(filename, config_name)
     return reload_config()
