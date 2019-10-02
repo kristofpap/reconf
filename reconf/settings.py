@@ -122,3 +122,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+CONFIG_PATH="/etc/nginx"
+# set it to None if you don't want to reload the config on change, or make it
+# a list of commands to run in sequence (aborting on the first error)
+RECONF_COMMAND="nginx -s reload"
+# trying to restart windows service:
+#RECONF_COMMAND=[ "net stop nginx", "net start nginx" ]
+# single string, may use {filename}
+TEST_COMMAND="nginx -tc {filename}"

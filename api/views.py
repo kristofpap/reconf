@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import subprocess
 from datetime import datetime
+from django.conf import settings
 
 # test with
 # pip install httpie
@@ -22,8 +23,6 @@ from datetime import datetime
 # http PUT  http://127.0.0.1:8000/nginx/undo/N - goes back to version number N
 # http PUT http://127.0.0.1:8000/nginx/reset - goes back the first version
 #
-
-CONFIG_PATH="/etc/nginx"
 
 class ConfigVersion:
     date_format = "%Y-%m-%d"
@@ -68,7 +67,7 @@ class ConfigVersion:
 
 
 # nginx.conf is always the current and newest version.
-def find_versions(path=CONFIG_PATH):
+def find_versions(path=settings.CONFIG_PATH):
     versions = list()
     for s in sorted(glob(os.path.join(path, "nginx-v*.conf"))):
         versions.append(ConfigVersion(s))
@@ -77,9 +76,9 @@ def find_versions(path=CONFIG_PATH):
 
 def find_filename(version=None):
     if version is None:
-        return os.path.join(CONFIG_PATH, "nginx.conf")
+        return os.path.join(settings.CONFIG_PATH, "nginx.conf")
     else:
-        for fn in glob(os.path.join(CONFIG_PATH, "nginx-v%03d_*.conf" % version)):
+        for fn in glob(os.path.join(settings.CONFIG_PATH, "nginx-v%03d_*.conf" % version)):
             return fn
 
 
@@ -105,7 +104,17 @@ def nginx_get_versions(request):
 
 
 def reload_config():
-    os.system("nginx -s reload")
+    if settings.RECONF_COMMAND:
+        if isinstance(settings.RECONF_COMMAND, str):
+            lst = [ settings.RECONF_COMMAND ]
+        else:
+            lst = settings.RECONF_COMMAND
+        for cmd in lst:
+            p = subprocess.run(cmd, shell=True, capture_output=True)
+        if p.returncode != 0:
+            return HttpResponseServerError(content=p.stderr)
+    return HttpResponse()
+
 
 
 def nginx_undo(request, version=None):
@@ -126,8 +135,7 @@ def nginx_undo(request, version=None):
     for t in vs:
         if t > v:
             os.unlink(t.filename)
-    reload_config()
-    return HttpResponse() # OK
+    return reload_config()
 
 
 def nginx_reset(request):
@@ -143,14 +151,15 @@ def nginx_reset(request):
 def nginx_test_config(request):
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-    with tempfile.NamedTemporaryFile(mode="wb", dir=CONFIG_PATH, delete=True) as tmp_conf:
+    with tempfile.NamedTemporaryFile(mode="wb", dir=settings.CONFIG_PATH, delete=True) as tmp_conf:
         print("HERE", "--"*40)
         for chunk in request.FILES['nginx'].chunks():
             print(chunk)
             tmp_conf.write(chunk)
         tmp_conf.flush()
         print("HERE", "--"*40)
-        p = subprocess.run("nginx -tc %s" % tmp_conf.name, shell=True, capture_output=True)
+        p = subprocess.run(settings.TEST_COMMAND.format(filename=tmp_conf.name),
+                           shell=True, capture_output=True)
         if p.returncode != 0:
             response = HttpResponseServerError(content=p.stderr)
             response['Content-Type'] = "text/plain"
@@ -159,10 +168,10 @@ def nginx_test_config(request):
 
 
 def nginx_set_config(request):
-    config_name = os.path.join(CONFIG_PATH, "nginx.conf")
+    config_name = os.path.join(settings.CONFIG_PATH, "nginx.conf")
     if request.method != 'POST':
         return HttpResponseNotAllowed(['POST'])
-    with tempfile.NamedTemporaryFile(mode="wb", dir=CONFIG_PATH, delete=False) as tmp_conf:
+    with tempfile.NamedTemporaryFile(mode="wb", dir=settings.CONFIG_PATH, delete=False) as tmp_conf:
         for chunk in request.FILES['nginx'].chunks():
             tmp_conf.write(chunk)
         tmp_conf.flush()
@@ -178,4 +187,4 @@ def nginx_set_config(request):
         v.date = datetime.now()
         shutil.move(config_name, v.filename)
         shutil.move(tmp_conf.name, config_name)
-        return HttpResponse() # OK
+    return reload_config()
